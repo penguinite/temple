@@ -1,199 +1,68 @@
-import std/[tables]
-from std/strutils import isEmptyOrWhitespace
-import temple/attributes
+import std/[json, strutils]
 
+const data = """
+Hello $name$!
+"""
+
+# First pass. Converting the input data into a basic set of tokens.
+# This set will be parsed more and more as we go on.
+# And this is just the starting point
 type
   TokenKind = enum
-    Block, # A block is an HTML section.
-    If, # signals an If condition
-    End, # signals an End condition
-    Item, # signals a template keyword
-    Attribute, # signals an attribute
+    Block, # A static block of text.
+    DollarSign, # Command start/end symbol
+    Colon, # Used for attributes.
+    Symbol, # A command.
   
   Token = object
     case kind*: TokenKind
-    of Block, Item, Attribute:
+    of Block, Symbol:
       inner*: string
-    of If:
-      condition*: string
-      result*: bool
-    else:
-      discard
+    else: discard
 
-proc templateify*(
-    input: string,
-    data: Table[string, string],
-    attributes: seq[TemplatingAttribute] = @[
-      createAttribute("bold", bold),
-      createAttribute("italic", italic),
-      createAttribute("list_by_comma", list_by_comma),
-      createAttribute("list_by_newline", list_by_newline),
-      createAttribute("span_separated", span_separated)
-    ]): string =
+# Basic lexer/tokenizer
+var
+  tokenTree: seq[Token] = @[]
+  backslash, cmdMode = false
+  tmp = ""
 
-  var
-    tokens: seq[Token]
-    inItem = false
-    tmp = ""
-
-  proc addToTree(k: TokenKind, s: string = "", b: bool = false) = 
-    ## A helper function for adding tokens to the tree easily.
-    var token = Token(kind: k) 
-    case k:
-    of Block, Item, Attribute:
-      token.inner = s
-    of If:
-      token.condition = s
-      token.result = b
-    else:
-      discard
-    tokens.add(token)
-
-  proc toggle(b: var bool) =
-    if b:b = false
-    else: b = true
-
-  # Tokenization process
-  for ch in input:
+for ch in data:
+  case cmdMode:
+  of true:
     case ch:
     of '$':
-      # Check if there is something in the tmp var already
-      # If so, then create a token with the appropriate type
-      if tmp != "":
-        if inItem:
-          case tmp:
-          of "end":
-            # Create an "End" token
-            addToTree(End)
-          else:
-            # create an "Item" token with the tmp var
-            # Since we are exiting a template keyword
-            addToTree(Item, tmp)
-        else:
-          # create a normal "Block" token with the tmp var
-          # Since we are creating a new template keyword
-          if not tmp.isEmptyOrWhitespace():
-            addToTree(Block, tmp)
-      # Either way, clear tmp at the end.
-      tmp = ""
-
-      # And flip the inItem switch on-and-off
-      toggle(inItem)
-    of '(':
-      if inItem:
-        # It's probably an if statement
-        # Clear tmp
-        tmp = ""
-    of ')':
-      # Add whatever we hav captured as an if satement
-      if tmp != "" and inItem:
-        var condition: bool
-        # add a simple NOT check.
-        if tmp[0] == '!':
-          tmp = tmp[1..^1]
-          condition = data.hasKey(tmp) and not data[tmp].isEmptyOrWhitespace()
-          toggle condition
-        else:
-          condition = data.hasKey(tmp) and not data[tmp].isEmptyOrWhitespace()
-
-        addToTree(If, tmp, condition)
-        tmp = ""
-    of '[':
-      # Clear tmp variable and add whatever item has been parsed.
-      if tmp != "":
-        addToTree(Item, tmp)
-      tmp = ""
-    of ']':
-      # Just add the attribute token.
-      if tmp != "":
-        addToTree(Attribute, tmp)
-      tmp = ""
-    else:
-      tmp.add(ch)
-  # One last check, just to see if there is a token we haven't parsed yet.
-  if tmp != "":
-    if inItem:
-      case tmp:
-      of "end":
-        # Create an "End" token
-        addToTree(End)
-      else:
-        # create an "Item" token with the tmp var
-        # Since we are exiting a template keyword
-        addToTree(Item, tmp)
-    else:
-      # create a normal "Block" token with the tmp var
-      # Since we are creating a new template keyword
+      # Just disable command mode...
+      cmdMode = false
+    of ':':
+      # Check if tmp already has data stored, if so,
+      # then add it to the tree and get ready to parse a new command.
       if not tmp.isEmptyOrWhitespace():
-        addToTree(Block, tmp)
+        tokenTree.add(Token(kind: Symbol, inner: tmp))
+        tmp = ""
+      tokenTree.add(Token(kind: Colon))
+    of ' ':
+      # Commands are space-separated, so, again, check if tmp
+      # already has something and if it does then add it to the tree
+      # and get ready to parse the next token
+      if not tmp.isEmptyOrWhitespace():
+        tokenTree.add(Token(kind: Symbol, inner: tmp))
+        tmp = ""
+    else:
+      # Just 
+      tmp.add(ch)
 
-  when defined(templeDebug):
-    for i in tokens:
-      echo "---"
-      echo "Kind: ", i.kind
-      case i.kind:
-      of Block, Item, Attribute:
-        echo "Inner: ", i.inner
-      of If:
-        echo "Condition: ", i.condition
-        echo "Result: ", i.result
-      else:
-        discard
-      
-  var
-    i, currentIf = -1
-    conditions: seq[bool]= @[]
-  for token in tokens:
-    inc i
+  of false
+    case ch:
+    of '$':
+
+when defined(templeDebug):
+  for token in tokenTree:
+    echo "type: ", token.kind
     case token.kind:
-    of Block:
-      # Check if a condition block us first
-      if currentIf >= 0:
-        # If condition exists
-        if conditions[currentIf] == false:
-          continue # We gotta skip
-        
-      result.add(token.inner)
-    of Item:
-      # Check if a condition block us first
-      if currentIf >= 0:
-        # If condition exists
-        if conditions[currentIf] == false:
-          continue # We gotta skip
+    of Block, Symbol:
+      echo "inner: ", token.inner
 
-      if not data.hasKey(token.inner):
-        continue # Check if item exists anyway
-      
-      var temp = data[token.inner]
-      # Check first if this is the last token
-      # Or if we can access any higher
-      if i + 1 <= high(tokens):
-        # If we can, then get the next token
-        # and check its type
-        # if its a "Attribute" token
-        # then apply it
-        let nextToken = tokens[i + 1]
-        if nextToken.kind == Attribute:
-          for attribute in attributes:
-            if nextToken.inner == attribute.marker:
-              {.gcsafe.}: # Well yeah, I guess its an indirect call...
-                          # But, why does it matter? I just don't get Nim's gcsafety...
-                temp = attribute.generator(temp)
 
-      # Finally, add the temp variable to the result
-      result.add(temp)
-    of If:
-      # Increase the if counter and add the condition to the list
-      inc currentIf
-      conditions.add(token.result)
-    of End:
-      # Decrease the currentIf counter
-      # but make sure it doesn't go below -1
-      if currentIf != -1:
-        dec currentIf
-        discard conditions.pop()
-    of Attribute:
-      # Attributes are already handled somewhere else, just skip.
-      continue
 
-  return result
+proc templateify*(input: string, data: JsonNode): string =
+  return
