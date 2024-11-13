@@ -1,20 +1,37 @@
 import helpers
 
 type
-  TokenKind* = enum
+  TokenKind = enum
     Block, # A static block of text.
     Colon, # Used for attributes.
     Symbol, # A command.
   
-  Token* = object
+  Token = object
     case kind*: TokenKind
     of Block, Symbol:
       inner*: string
     else: discard
 
-  ASItem = object
+  ASTNodeKind = enum
+    Block, # A static block of text
+    Item, # A basic string substitution
+    Conditional, # A conditional
+    Loop, # A loop
+    Attribute, # An attribute
 
-  ASTree = object ## WIP
+  ASTNode = object
+    case kind*: ASTNodeKind
+    of Block, Item: inner*: string
+    of Attribute: attr*: string
+    of Conditional:
+      condition*: string
+      pass*: seq[ASTNode]
+      otherwise*: seq[ASTNode]
+    of Loop:
+      item*: string
+      contents*: seq[ASTNode]
+
+  AST = seq[ASTNode]
 
 proc tokenize*(input: string): seq[Token] =
   ## Converts an input into a set of tokens.
@@ -81,12 +98,32 @@ proc tokenize*(input: string): seq[Token] =
   return result
 
 ## WIP
-proc lex*(set: seq[Token]): ASTree =
+proc lex*(tokenSet: seq[Token]): AST =
   ## This proc converts a simple sequence of tokens into an AST.
   ## This is the second stage of parsing.
+  var
+    depth = 0
+    curSet: seq[ASTNode]
+    
+  for token in tokenSet:
+    case token.kind:
+    of Block:
+      curSet.add(ASTNode(kind: Block, inner: token.inner))
+    of Symbol:
+      case token.inner:
+      of "if":
+        
+        if depth == 0
+      of "end":
+      else:
+        curSet.add(ASTNode(kind: Item, inner: token.inner))
+    else:
+      echo "Help"
+
+
   return
 
-proc parse*(tree: ASTree, data: JsonNode): string =
+proc parse*(tree: AST, data: JsonNode): string =
   ## This proc parses the AST, and *finally* returns the templated data.
   ## This is the final stage of parsing.
-  return
+  return "Help"

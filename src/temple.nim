@@ -10,11 +10,12 @@ proc templateify*(input: string, data: JsonNode, failAction = TFRaiseException):
   # And this is just the starting point
   when not defined(templeDebug):
     # I wish my life could be as harmonious as this one-liner
+    # Note: It's only harmonious on the surface. Don't dive deep into temple/private/parser
     return tokenize(input).lex().parse(data) 
   else:
     let tokens = tokenize(input)
     echo "lex() output:"
-    for token in tokenTree:
+    for token in tokens:
       echo "type: ", token.kind
       case token.kind:
       of Block, Symbol:

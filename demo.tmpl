@@ -1,0 +1,65 @@
+<h1>Temple2 Demo File</h1>
+
+<p>Basic string substitution is still supported:</p>
+<p>Hello $name$!</p>
+
+<p>Conditionals are still supported, though the syntax is a bit different.</p>
+$if name$
+    <p>Hello $name$!</p>
+$end$
+
+<p>And support for the "not" operator still exists:</p>
+$if !name$
+    <p>I don't have a name?!?</p>
+$end$
+
+<p>Conditionals also now support else blocks!</p>
+$if name$
+    <p>I <b>do</b> have a name and it's $name$</p>
+$else$
+    <p>I don't have a name?!?</p>
+$end$
+
+<p>Attributes are supported but the syntax is slightly different</p>
+<p>My name is $name:bold$, god damn it!!!</p>
+<p>And of course, the default attributes are still there...</p>
+
+<p>But also, temple now supports loops!</p>
+<p>You can loop over an array containing strings like so</p>
+<ul>
+$for thing in array$
+    <li>$thing</li>
+$end$
+</ul>
+
+<p>You can loop over JSON Objects... yes... An array containing "Objects" is a loopable thing.</p>
+<p>This was mostly implemented for, if some day, Pothole (or a frontend for it) wants to support "user pages"</p>
+<p>Here is how an "Object" loop looks like:</p>
+$for image in images$
+    <img src="$image.url$" alt="$image.alt$">
+$end$
+
+This feature looks like this in client code:
+<code>
+import temple, std/json
+
+
+
+echo templateify(
+    "$for image in images$\n    <img src=\"$image.url$\" alt=\"$image.alt$\">\n$end$",
+    %* {
+        "images": [
+            {"url": "A.png","alt": "A single image"},
+            {"url": "B.png", "alt": "Another image"},
+            {"url": "C.png", "alt": "A third image"}
+        ]
+    }
+)
+</code>
+
+<p>Calling that would output:</p>
+<pre>
+&lt;img src="A.png" alt="A single image"&gt;
+&lt;img src="B.png" alt="Another image"&gt;
+&lt;img src="C.png" alt="A third image"&gt;
+</pre>
