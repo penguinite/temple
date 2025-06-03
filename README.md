@@ -1,5 +1,9 @@
 # temple
 
+**Migration notice:** The git repository for this project has moved to [https://codeberg.org/onbox/temple](https://codeberg.org/onbox/temple), this link will still work but it will not contain any new updates. Documentation for this project is available at [https://pony.biz/temple/](https://pony.biz/temple/)
+
+---
+
 A simple templating library, temple was designed with ease of use and performance in mind.
 
 Temple is perfect for the following use-cases:
